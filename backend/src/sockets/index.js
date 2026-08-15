@@ -3,6 +3,7 @@ import { corsOptions } from '../config/cors.js';
 import { logger } from '../config/logger.js';
 import { socketAuth } from './socketAuth.js';
 import { registerMessageHandlers } from './messageHandlers.js';
+import { registerTypingHandlers } from './typingHandlers.js';
 
 let io = null;
 
@@ -27,6 +28,7 @@ export const initializeSocket = (httpServer) => {
     socket.emit('authenticated', { userId: socket.userId });
 
     registerMessageHandlers(io, socket);
+    registerTypingHandlers(socket);
 
     socket.on('disconnect', (reason) => {
       logger.info(`Socket disconnected: user=${socket.userId} socket=${socket.id} reason=${reason}`);
