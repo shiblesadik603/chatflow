@@ -6,6 +6,23 @@ import { areBlocked } from './userService.js';
 
 const SENDER_FIELDS = 'name avatar';
 
+// Used internally by groupService for membership/rename announcements -
+// never called directly by a client request, so no participant/block
+// checks: the caller (groupService) has already established the actor is
+// allowed to be doing this. `content` deliberately doesn't repeat the
+// actor's name - the message's populated `sender` field already carries
+// that, and the frontend renders system messages as "{sender.name} {content}".
+export const createSystemMessage = async (conversationId, actorUserId, content) => {
+  const created = await Message.create({
+    conversation: conversationId,
+    sender: actorUserId,
+    content,
+    messageType: 'system',
+  });
+  await Conversation.findByIdAndUpdate(conversationId, { lastMessage: created._id });
+  return Message.findById(created._id).populate('sender', SENDER_FIELDS);
+};
+
 export const createMessage = async (userId, conversationId, payload) => {
   const conversation = await assertParticipant(userId, conversationId);
 
