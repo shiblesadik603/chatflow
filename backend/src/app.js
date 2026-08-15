@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import './models/index.js';
 import { env } from './config/env.js';
+import { corsOptions } from './config/cors.js';
 import { logger } from './config/logger.js';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
@@ -15,7 +16,7 @@ import messageRoutes from './routes/messageRoutes.js';
 export const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
