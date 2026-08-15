@@ -4,6 +4,7 @@ import { io as ioClient } from 'socket.io-client';
 import { app } from '../src/app.js';
 import { initializeSocket } from '../src/sockets/index.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
 
 let httpServer;
@@ -25,6 +26,8 @@ afterEach(clearTestDB);
 
 afterAll(async () => {
   await new Promise((resolve) => httpServer.close(resolve));
+  // initializeSocket() pulls in the Redis client via presenceHandlers now.
+  await disconnectTestRedis();
   await disconnectTestDB();
 });
 

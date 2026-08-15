@@ -6,6 +6,7 @@ import { initializeSocket } from '../src/sockets/index.js';
 import { env } from '../src/config/env.js';
 import { User } from '../src/models/User.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
 
 let httpServer;
@@ -29,6 +30,10 @@ afterEach(clearTestDB);
 
 afterAll(async () => {
   await new Promise((resolve) => httpServer.close(resolve));
+  // initializeSocket() now pulls in presenceHandlers -> the Redis client,
+  // so every socket test file needs to close it too, or Jest hangs
+  // afterward waiting for that open TCP handle to go away.
+  await disconnectTestRedis();
   await disconnectTestDB();
 });
 
