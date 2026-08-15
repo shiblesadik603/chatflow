@@ -1,11 +1,16 @@
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
 
 beforeAll(connectTestDB);
 afterEach(clearTestDB);
-afterAll(disconnectTestDB);
+afterAll(async () => {
+  // app.js transitively opens a Redis connection now (see health.test.js).
+  await disconnectTestRedis();
+  await disconnectTestDB();
+});
 
 const auth = (token) => `Bearer ${token}`;
 

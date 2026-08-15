@@ -1,12 +1,31 @@
+import http from 'http';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { Message } from '../src/models/Message.js';
+import { initializeSocket } from '../src/sockets/index.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
 
-beforeAll(connectTestDB);
+let httpServer;
+
+beforeAll(async () => {
+  await connectTestDB();
+  // PATCH/DELETE now broadcast over Socket.IO (Phase 12), so getIO() needs
+  // a real Server instance to exist even though these tests only exercise
+  // the REST layer and never connect a socket client themselves. Still
+  // listened-and-closed like every other socket test file - an unlistened
+  // server leaves Socket.IO's internal timers running and Jest hangs.
+  httpServer = http.createServer();
+  initializeSocket(httpServer);
+  await new Promise((resolve) => httpServer.listen(0, resolve));
+});
 afterEach(clearTestDB);
-afterAll(disconnectTestDB);
+afterAll(async () => {
+  await new Promise((resolve) => httpServer.close(resolve));
+  await disconnectTestRedis();
+  await disconnectTestDB();
+});
 
 const auth = (token) => `Bearer ${token}`;
 

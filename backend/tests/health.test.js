@@ -1,5 +1,13 @@
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
+
+// app.js now transitively imports the Redis client (messageController.js
+// needs getIO() from sockets/index.js, which pulls in presenceHandlers ->
+// presenceService -> config/redis.js), which connects at import time
+// regardless of whether any test here uses sockets. Every file that
+// imports app.js needs to close it, or Jest hangs on exit.
+afterAll(disconnectTestRedis);
 
 describe('GET /api/health', () => {
   it('returns 200 and a success payload', async () => {

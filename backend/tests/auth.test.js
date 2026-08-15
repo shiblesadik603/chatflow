@@ -3,10 +3,15 @@ import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { RefreshToken } from '../src/models/RefreshToken.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
+import { disconnectTestRedis } from './utils/testRedis.js';
 
 beforeAll(connectTestDB);
 afterEach(clearTestDB);
-afterAll(disconnectTestDB);
+afterAll(async () => {
+  // app.js transitively opens a Redis connection now (see health.test.js).
+  await disconnectTestRedis();
+  await disconnectTestDB();
+});
 
 const validUser = { name: 'Test User', email: 'test@example.com', password: 'password123' };
 
