@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 export const app = express();
 
@@ -28,9 +29,9 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
-// More feature routes are mounted here in later phases, e.g.:
-// app.use('/api/users', userRoutes);
+// More feature routes are mounted here in later phases.
 
 app.use(notFoundHandler);
 app.use(errorHandler);

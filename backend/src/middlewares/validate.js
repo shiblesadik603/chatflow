@@ -1,7 +1,8 @@
 import { AppError } from '../utils/AppError.js';
 
-export const validate = (schema) => (req, res, next) => {
-  const result = schema.safeParse(req.body);
+// source lets the same middleware validate req.body, req.query, or req.params.
+export const validate = (schema, source = 'body') => (req, res, next) => {
+  const result = schema.safeParse(req[source]);
 
   if (!result.success) {
     return next(
@@ -9,6 +10,6 @@ export const validate = (schema) => (req, res, next) => {
     );
   }
 
-  req.body = result.data;
+  req[source] = result.data;
   next();
 };
