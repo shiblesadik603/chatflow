@@ -57,6 +57,20 @@ export const createOrGetPrivateConversation = async (currentUserId, otherUserId)
 export const listConversations = (userId) =>
   populateConversation(Conversation.find({ participants: userId })).sort({ updatedAt: -1 });
 
+// Lightweight participant check (no populate) - reused by messageService so
+// it doesn't have to duplicate this logic for its own conversation lookups.
+export const assertParticipant = async (userId, conversationId) => {
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    throw new AppError('Conversation not found', 404, 'CONVERSATION_NOT_FOUND');
+  }
+  const isParticipant = conversation.participants.some((p) => p.toString() === userId.toString());
+  if (!isParticipant) {
+    throw new AppError('You are not part of this conversation', 403, 'NOT_A_PARTICIPANT');
+  }
+  return conversation;
+};
+
 const findConversationForParticipant = async (userId, conversationId) => {
   const conversation = await populateConversation(Conversation.findById(conversationId));
   if (!conversation) {

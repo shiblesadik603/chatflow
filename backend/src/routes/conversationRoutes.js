@@ -4,6 +4,7 @@ import { protect } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
 import { validateObjectId } from '../middlewares/validateObjectId.js';
 import { createConversationSchema } from '../validators/conversationValidators.js';
+import conversationMessageRoutes from './conversationMessageRoutes.js';
 
 const router = Router();
 
@@ -13,5 +14,11 @@ router.post('/', validate(createConversationSchema), conversationController.crea
 router.get('/', conversationController.listConversations);
 router.get('/:id', validateObjectId('id'), conversationController.getConversation);
 router.delete('/:id', validateObjectId('id'), conversationController.deleteConversation);
+
+router.use(
+  '/:conversationId/messages',
+  validateObjectId('conversationId'),
+  conversationMessageRoutes
+);
 
 export default router;
