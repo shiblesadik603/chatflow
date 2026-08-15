@@ -22,6 +22,7 @@ export const errorHandler = (err, req, res, next) => {
     success: false,
     message,
     errorCode,
+    ...(isAppError && err.details ? { details: err.details } : {}),
     ...(env.NODE_ENV !== 'production' && !isAppError ? { stack: err.stack } : {}),
   });
 };

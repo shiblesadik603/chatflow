@@ -1,24 +1,10 @@
-import mongoose from 'mongoose';
 import { User } from '../src/models/User.js';
 import { Conversation } from '../src/models/Conversation.js';
+import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
 
-// Connects directly to a separate `chatflow_test` database - deliberately
-// bypassing the app's own env config so these tests never touch dev data.
-const TEST_DB_URI = 'mongodb://127.0.0.1:27017/chatflow_test';
-
-beforeAll(async () => {
-  await mongoose.connect(TEST_DB_URI);
-});
-
-afterEach(async () => {
-  const { collections } = mongoose.connection;
-  await Promise.all(Object.values(collections).map((c) => c.deleteMany({})));
-});
-
-afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.disconnect();
-});
+beforeAll(connectTestDB);
+afterEach(clearTestDB);
+afterAll(disconnectTestDB);
 
 describe('User model', () => {
   it('rejects a duplicate email', async () => {

@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
 
 const { Schema } = mongoose;
+const SALT_ROUNDS = 12;
 
 const userSchema = new Schema(
   {
@@ -19,7 +21,7 @@ const userSchema = new Schema(
       trim: true,
     },
     password: {
-      // Hashed with bcrypt before saving - wired up in Phase 3 (Authentication).
+      // Hashed with bcrypt by the pre-save hook below - never stored in plain text.
       type: String,
       required: [true, 'Password is required'],
       minlength: 8,
@@ -56,6 +58,15 @@ const userSchema = new Schema(
 // Note: `email` already gets a unique index from `unique: true` above -
 // calling .index({ email: 1 }) again here would just create a duplicate.
 userSchema.index({ name: 1 });
+
+userSchema.pre('save', async function hashPassword() {
+  if (!this.isModified('password')) return;
+  this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
+});
+
+userSchema.methods.comparePassword = function comparePassword(candidate) {
+  return bcrypt.compare(candidate, this.password);
+};
 
 userSchema.set('toJSON', {
   transform: (_doc, ret) => {
