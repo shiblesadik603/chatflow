@@ -126,3 +126,75 @@ export const deleteMessage = async (userId, messageId) => {
   // Broadcasting `message_deleted` over Socket.IO happens in Phase 12.
   return message;
 };
+
+// Marks one message delivered to the current user. Idempotent and silent
+// on a duplicate call or a sender marking their own message - both return
+// { delivered: false } rather than an error, since neither is a mistake a
+// client should be scolded for (a reconnect can easily re-fire this).
+export const markDelivered = async (userId, messageId) => {
+  const message = await Message.findById(messageId);
+  if (!message) {
+    throw new AppError('Message not found', 404, 'MESSAGE_NOT_FOUND');
+  }
+
+  await assertParticipant(userId, message.conversation);
+
+  if (message.sender.toString() === userId.toString()) {
+    return { message, delivered: false };
+  }
+
+  // The query condition ('deliveredTo.user': { $ne: userId }) makes this
+  // atomic: if two "delivered" acks for the same message and user race
+  // each other, only one of them actually matches and updates.
+  const updated = await Message.findOneAndUpdate(
+    { _id: messageId, 'deliveredTo.user': { $ne: userId } },
+    {
+      $push: { deliveredTo: { user: userId, deliveredAt: new Date() } },
+      // Only upgrade sent -> delivered; never downgrade a message that's
+      // already been read by someone back down to "just delivered".
+      ...(message.status === 'sent' ? { $set: { status: 'delivered' } } : {}),
+    },
+    { new: true }
+  );
+
+  if (!updated) {
+    return { message, delivered: false }; // already delivered, including a lost race
+  }
+
+  return { message: updated, delivered: true };
+};
+
+// Marks every unread message in a conversation as read by the current
+// user, in one batch - matching "user opens the conversation", not
+// per-message scroll tracking. Returns which messages were newly marked,
+// grouped by sender, so the caller can notify each sender once with the
+// full list rather than firing one event per message.
+export const markConversationRead = async (userId, conversationId) => {
+  await assertParticipant(userId, conversationId);
+
+  const messagesToMark = await Message.find({
+    conversation: conversationId,
+    sender: { $ne: userId },
+    'readBy.user': { $ne: userId },
+  }).select('_id sender');
+
+  if (messagesToMark.length === 0) {
+    return { messageIds: [], bySender: new Map() };
+  }
+
+  const messageIds = messagesToMark.map((m) => m._id);
+
+  await Message.updateMany(
+    { _id: { $in: messageIds } },
+    { $push: { readBy: { user: userId, readAt: new Date() } }, $set: { status: 'read' } }
+  );
+
+  const bySender = new Map();
+  messagesToMark.forEach((m) => {
+    const senderId = m.sender.toString();
+    if (!bySender.has(senderId)) bySender.set(senderId, []);
+    bySender.get(senderId).push(m._id.toString());
+  });
+
+  return { messageIds: messageIds.map((id) => id.toString()), bySender };
+};

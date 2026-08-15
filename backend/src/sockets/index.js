@@ -4,6 +4,7 @@ import { logger } from '../config/logger.js';
 import { socketAuth } from './socketAuth.js';
 import { registerMessageHandlers } from './messageHandlers.js';
 import { registerTypingHandlers } from './typingHandlers.js';
+import { registerReadReceiptHandlers } from './readReceiptHandlers.js';
 import { handlePresenceConnect, handlePresenceDisconnect } from './presenceHandlers.js';
 
 let io = null;
@@ -27,6 +28,7 @@ export const initializeSocket = (httpServer) => {
     // handler exists.
     registerMessageHandlers(io, socket);
     registerTypingHandlers(socket);
+    registerReadReceiptHandlers(io, socket);
 
     socket.on('disconnect', async (reason) => {
       logger.info(`Socket disconnected: user=${socket.userId} socket=${socket.id} reason=${reason}`);
