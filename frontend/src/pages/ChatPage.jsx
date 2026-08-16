@@ -5,7 +5,7 @@ import { Sidebar } from '../components/Sidebar.jsx';
 import { ChatWindow } from '../components/ChatWindow.jsx';
 
 export const ChatPage = () => {
-  const { socket } = useSocket();
+  const { socket, isConnected } = useSocket();
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +80,7 @@ export const ChatPage = () => {
 
   return (
     <div className="chat-page">
+      {!isConnected && <div className="connection-banner">Connection lost - reconnecting...</div>}
       <Sidebar
         conversations={conversations}
         activeConversationId={activeConversation?._id}

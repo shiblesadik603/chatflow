@@ -14,3 +14,10 @@ export const uploadChatFile = async (file, type, duration) => {
   const res = await apiClient.post('/api/uploads/chat', formData);
   return res.data.data; // { url, fileName, mimeType, size, duration? }
 };
+
+export const uploadAvatar = async (file) => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const res = await apiClient.post('/api/uploads/avatar', formData);
+  return res.data.data.user; // avatar is updated server-side; returns the full updated user
+};

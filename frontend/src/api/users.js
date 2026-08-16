@@ -10,7 +10,20 @@ export const getUser = async (id) => {
   return res.data.data.user;
 };
 
+export const getMe = async () => {
+  const res = await apiClient.get('/api/users/me');
+  return res.data.data.user;
+};
+
 export const updateMe = async (updates) => {
   const res = await apiClient.patch('/api/users/me', updates);
   return res.data.data.user;
+};
+
+export const blockUser = async (id) => {
+  await apiClient.post(`/api/users/${id}/block`);
+};
+
+export const unblockUser = async (id) => {
+  await apiClient.delete(`/api/users/${id}/block`);
 };

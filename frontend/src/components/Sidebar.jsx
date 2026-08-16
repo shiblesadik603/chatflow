@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { searchUsers } from '../api/users.js';
 import { createConversation } from '../api/conversations.js';
 import { createGroup } from '../api/groups.js';
+import { Avatar } from './Avatar.jsx';
+import { ProfilePanel } from './ProfilePanel.jsx';
 
 const otherParticipant = (conversation, currentUserId) =>
   conversation.participants.find((p) => p._id !== currentUserId);
@@ -39,6 +41,7 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [groupError, setGroupError] = useState('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     clearTimeout(searchTimeout.current);
@@ -101,14 +104,16 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <div className="current-user">
-          <span className="avatar-circle">{user.name[0].toUpperCase()}</span>
+        <button type="button" className="current-user" onClick={() => setIsProfileOpen(true)}>
+          <Avatar name={user.name} avatarUrl={user.avatar} />
           <span>{user.name}</span>
-        </div>
+        </button>
         <button className="link-button" onClick={logout}>
           Log out
         </button>
       </div>
+
+      {isProfileOpen && <ProfilePanel onClose={() => setIsProfileOpen(false)} />}
 
       <div className="sidebar-search">
         <div className="search-row">
@@ -171,9 +176,10 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
                   className={`search-result ${isSelected ? 'selected' : ''}`}
                   onClick={() => (isGroupMode ? toggleMember(result) : handleStartConversation(result._id))}
                 >
-                  <span className="avatar-circle">{result.name[0].toUpperCase()}</span>
+                  <Avatar name={result.name} avatarUrl={result.avatar}>
+                    {result.isOnline && <span className="online-dot" title="Online" />}
+                  </Avatar>
                   <span>{result.name}</span>
-                  {result.isOnline && <span className="online-dot" title="Online" />}
                   {isSelected && <span className="member-check">✓</span>}
                 </button>
               );
@@ -192,10 +198,12 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
               className={`conversation-item ${conversation._id === activeConversationId ? 'active' : ''}`}
               onClick={() => onSelectConversation(conversation)}
             >
-              <span className="avatar-circle">
-                {conversationLabel(conversation, user._id)[0]?.toUpperCase()}
+              <Avatar
+                name={conversationLabel(conversation, user._id)}
+                avatarUrl={conversation.type === 'group' ? conversation.group?.avatar : other?.avatar}
+              >
                 {other?.isOnline && <span className="online-dot" />}
-              </span>
+              </Avatar>
               <span className="conversation-info">
                 <span className="conversation-name">{conversationLabel(conversation, user._id)}</span>
                 <span className="conversation-preview">{previewText(conversation.lastMessage)}</span>

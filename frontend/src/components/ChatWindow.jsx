@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import { listMessages } from '../api/messages.js';
+import { blockUser, unblockUser } from '../api/users.js';
 import { MessageBubble } from './MessageBubble.jsx';
 import { MessageInput } from './MessageInput.jsx';
 import { GroupInfoPanel } from './GroupInfoPanel.jsx';
@@ -11,16 +12,20 @@ const conversationTitle = (conversation, currentUserId) => {
   return conversation.participants.find((p) => p._id !== currentUserId)?.name || 'Unknown user';
 };
 
+const otherParticipant = (conversation, currentUserId) =>
+  conversation.type === 'private' ? conversation.participants.find((p) => p._id !== currentUserId) : null;
+
 const TYPING_STOP_DELAY = 2000;
 
 export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConversation }) => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [sendError, setSendError] = useState('');
   const [typingUserIds, setTypingUserIds] = useState([]);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const [isBlockBusy, setIsBlockBusy] = useState(false);
   const messagesEndRef = useRef(null);
   // Tracks whether *this* client has already told the room it's typing, so
   // typing_start only fires once per burst of keystrokes instead of on
@@ -191,6 +196,33 @@ export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConvers
     return <div className="chat-window empty-state">Select a conversation to start chatting.</div>;
   }
 
+  const chatPartner = otherParticipant(conversation, user._id);
+  // blockedUsers only ever tells us who *we've* blocked - if the other
+  // person has blocked us instead, there's no way to know that in advance;
+  // it only surfaces when a send actually fails (handleSend's ack.message
+  // below, via the BLOCKED errorCode the backend already returns).
+  const isBlocked = chatPartner && user.blockedUsers?.includes(chatPartner._id);
+
+  const handleToggleBlock = async () => {
+    if (!chatPartner) return;
+    const action = isBlocked ? 'Unblock' : 'Block';
+    if (!window.confirm(`${action} ${chatPartner.name}?`)) return;
+    setIsBlockBusy(true);
+    try {
+      if (isBlocked) {
+        await unblockUser(chatPartner._id);
+        setUser((prev) => ({ ...prev, blockedUsers: prev.blockedUsers.filter((id) => id !== chatPartner._id) }));
+      } else {
+        await blockUser(chatPartner._id);
+        setUser((prev) => ({ ...prev, blockedUsers: [...prev.blockedUsers, chatPartner._id] }));
+      }
+    } catch (err) {
+      setSendError(err.response?.data?.message || `Failed to ${action.toLowerCase()} user.`);
+    } finally {
+      setIsBlockBusy(false);
+    }
+  };
+
   return (
     <div className="chat-window">
       <header className="chat-header">
@@ -200,8 +232,19 @@ export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConvers
             Group Info
           </button>
         )}
+        {chatPartner && (
+          <button type="button" className="link-button" onClick={handleToggleBlock} disabled={isBlockBusy}>
+            {isBlocked ? 'Unblock' : 'Block'}
+          </button>
+        )}
         {!isConnected && <span className="connection-warning">Reconnecting...</span>}
       </header>
+
+      {isBlocked && (
+        <div className="blocked-banner">
+          You've blocked {chatPartner.name}. Unblock them to send and receive messages.
+        </div>
+      )}
 
       {isGroupInfoOpen && conversation.group && (
         <GroupInfoPanel
@@ -232,7 +275,7 @@ export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConvers
       )}
 
       {sendError && <div className="error-banner">{sendError}</div>}
-      <MessageInput onSend={handleSend} onTyping={handleTyping} disabled={!isConnected} />
+      <MessageInput onSend={handleSend} onTyping={handleTyping} disabled={!isConnected || isBlocked} />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import {
   promoteGroupAdmin,
   leaveGroup,
 } from '../api/groups.js';
+import { Avatar } from './Avatar.jsx';
 
 export const GroupInfoPanel = ({ groupId, currentUserId, onClose, onChanged, onLeft }) => {
   const [group, setGroup] = useState(null);
@@ -164,10 +165,9 @@ export const GroupInfoPanel = ({ groupId, currentUserId, onClose, onChanged, onL
             const memberIsAdmin = group.admins.some((a) => a._id === member._id);
             return (
               <div key={member._id} className="group-member-row">
-                <span className="avatar-circle">
-                  {member.name[0].toUpperCase()}
+                <Avatar name={member.name} avatarUrl={member.avatar}>
                   {member.isOnline && <span className="online-dot" />}
-                </span>
+                </Avatar>
                 <span className="group-member-name">
                   {member.name}
                   {member._id === currentUserId && ' (you)'}
@@ -227,7 +227,7 @@ export const GroupInfoPanel = ({ groupId, currentUserId, onClose, onChanged, onL
                           className={`search-result ${isSelected ? 'selected' : ''}`}
                           onClick={() => toggleSelectToAdd(r)}
                         >
-                          <span className="avatar-circle">{r.name[0].toUpperCase()}</span>
+                          <Avatar name={r.name} avatarUrl={r.avatar} />
                           <span>{r.name}</span>
                           {isSelected && <span className="member-check">✓</span>}
                         </button>
