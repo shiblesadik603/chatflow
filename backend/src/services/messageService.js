@@ -50,7 +50,14 @@ export const createMessage = async (userId, conversationId, payload) => {
     await Conversation.findByIdAndUpdate(conversationId, { lastMessage: created._id });
 
     const message = await Message.findById(created._id).populate('sender', SENDER_FIELDS);
-    return { message, created: true };
+    // Returned alongside the message (not re-fetched by callers) since
+    // assertParticipant above already loaded it for free - used to notify
+    // every participant's personal room, not just the conversation room,
+    // so a client that hasn't opened this specific conversation yet still
+    // learns a new message arrived (see sockets/index.js's per-userId room
+    // from Phase 8).
+    const participantIds = conversation.participants.map((p) => p.toString());
+    return { message, created: true, participantIds };
   } catch (err) {
     if (err.code === 11000 && clientMessageId) {
       // Same idempotency pattern as conversation creation (Phase 5): a
@@ -63,7 +70,7 @@ export const createMessage = async (userId, conversationId, payload) => {
         sender: userId,
         clientMessageId,
       }).populate('sender', SENDER_FIELDS);
-      return { message: existing, created: false };
+      return { message: existing, created: false, participantIds: [] };
     }
     throw err;
   }

@@ -3,7 +3,7 @@ import { getIO } from '../sockets/index.js';
 
 export const createMessage = async (req, res, next) => {
   try {
-    const { message, created } = await messageService.createMessage(
+    const { message, created, participantIds } = await messageService.createMessage(
       req.user._id,
       req.params.conversationId,
       req.body
@@ -16,7 +16,11 @@ export const createMessage = async (req, res, next) => {
       // socket's send_message event. Mirrors the same `created` guard
       // used there: an idempotent retry (created: false) was already
       // broadcast the first time and doesn't need a second announcement.
-      getIO().to(message.conversation.toString()).emit('new_message', message);
+      const io = getIO();
+      io.to(message.conversation.toString()).emit('new_message', message);
+      // See messageHandlers.js send_message for why this also goes to
+      // each participant's personal room, not just the conversation room.
+      participantIds.forEach((id) => io.to(id).emit('conversation_activity', { conversationId: message.conversation.toString() }));
     }
 
     res.status(created ? 201 : 200).json({ success: true, data: { message } });

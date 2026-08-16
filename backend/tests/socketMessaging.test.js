@@ -241,3 +241,58 @@ describe('send_message / new_message', () => {
     bobSocket.close();
   });
 });
+
+describe('send_message / conversation_activity', () => {
+  it('delivers conversation_activity to a participant who never joined the room', async () => {
+    const { accessToken: aliceToken } = await createTestUser({ name: 'Alice Activity' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'Bob Activity' });
+    const conversationId = await createConversation(aliceToken, bob._id);
+
+    const alice = await connectAndAuth(aliceToken);
+    const bobSocket = await connectAndAuth(bobToken);
+
+    await emitWithAck(alice, 'join_conversation', { conversationId });
+    // Bob deliberately does NOT join - this is the exact gap conversation_activity
+    // exists to cover: new_message is room-scoped and would never reach him
+    // (see the "delivers new_message only to sockets that joined the room" test
+    // above), but his sidebar still needs to learn a message arrived.
+
+    const bobActivityPromise = waitForEventOrTimeout(bobSocket, 'conversation_activity');
+    const bobMessagePromise = waitForEventOrTimeout(bobSocket, 'new_message');
+
+    const sendRes = await emitWithAck(alice, 'send_message', { conversationId, content: 'Hi Bob' });
+    expect(sendRes.success).toBe(true);
+
+    const bobActivity = await bobActivityPromise;
+    expect(bobActivity).toEqual({ conversationId });
+    expect(await bobMessagePromise).toBeNull(); // room-scoped event still doesn't reach him
+
+    alice.close();
+    bobSocket.close();
+  });
+
+  it('does not broadcast conversation_activity for a retried send with the same clientMessageId', async () => {
+    const { accessToken: aliceToken } = await createTestUser({ name: 'Alice Activity Retry' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'Bob Activity Retry' });
+    const conversationId = await createConversation(aliceToken, bob._id);
+
+    const alice = await connectAndAuth(aliceToken);
+    const bobSocket = await connectAndAuth(bobToken);
+
+    const received = [];
+    bobSocket.on('conversation_activity', (payload) => received.push(payload));
+
+    const body = { conversationId, content: 'Once only', clientMessageId: 'activity-retry-1' };
+    const first = await emitWithAck(alice, 'send_message', body);
+    const retry = await emitWithAck(alice, 'send_message', body);
+
+    expect(first.data.created).toBe(true);
+    expect(retry.data.created).toBe(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(received).toHaveLength(1);
+
+    alice.close();
+    bobSocket.close();
+  });
+});

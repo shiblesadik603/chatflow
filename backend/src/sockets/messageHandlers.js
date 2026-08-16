@@ -63,7 +63,7 @@ export const registerMessageHandlers = (io, socket) => {
       // The exact same service function the REST endpoint uses (Phase 6) -
       // participant check, block check, idempotency, and lastMessage
       // update all happen here with zero duplicated logic.
-      const { message, created } = await messageService.createMessage(
+      const { message, created, participantIds } = await messageService.createMessage(
         socket.userId,
         conversationId,
         messageInput
@@ -74,6 +74,13 @@ export const registerMessageHandlers = (io, socket) => {
         // same clientMessageId returns the existing message (created:
         // false) and every room member already received it the first time.
         io.to(conversationId).emit('new_message', message);
+
+        // Reaches every device a participant has open, even ones that
+        // haven't called join_conversation for this specific conversation
+        // (e.g. a brand new chat, or an existing one just not currently
+        // open) - conversation list previews/unread badges need this;
+        // new_message's room-scoped delivery deliberately doesn't cover it.
+        participantIds.forEach((id) => io.to(id).emit('conversation_activity', { conversationId }));
       }
 
       safeAck(ack, { success: true, data: { message, created } });
