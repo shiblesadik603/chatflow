@@ -4,10 +4,12 @@ import cors from 'cors';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
+import swaggerUi from 'swagger-ui-express';
 import './models/index.js';
 import { env } from './config/env.js';
 import { corsOptions } from './config/cors.js';
 import { logger } from './config/logger.js';
+import { swaggerSpec } from './config/swagger.js';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -36,6 +38,14 @@ if (env.TRUST_PROXY > 0) {
   app.set('trust proxy', env.TRUST_PROXY);
 }
 
+// Mounted before the global helmet() below on purpose: Swagger UI ships
+// its own bundled JS/CSS with inline styles, which the strict default CSP
+// applied to every other route would block. Registering it first means it
+// never inherits that policy in the first place, rather than needing to
+// fight with overriding a header a later middleware already set.
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: 'ChatFlow API Docs' }));
+app.get('/api-docs.json', (req, res) => res.json(swaggerSpec)); // raw spec, for tooling/CI validation
+
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' }));
@@ -53,6 +63,26 @@ app.use(mongoSanitize());
 const morganStream = { write: (message) => logger.info(message.trim()) };
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: morganStream }));
 
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Liveness check
+ *     description: Does not check MongoDB/Redis connectivity - just confirms the process is up and serving requests. Used by the Developer Dashboard (Phase 22) and manual verification throughout every phase.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: The API is running.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: ChatFlow API is running }
+ *                 timestamp: { type: string, format: date-time }
+ */
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
