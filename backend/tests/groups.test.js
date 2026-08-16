@@ -428,6 +428,68 @@ describe('POST /api/groups/:id/admins', () => {
   });
 });
 
+describe('group actions broadcast conversation_activity', () => {
+  it('notifies a member who has not joined the room when a group is created', async () => {
+    const { accessToken } = await createTestUser({ name: 'ActivityCreator' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'ActivityBob' });
+
+    const bobSocket = await connectAndAuth(bobToken);
+    const eventPromise = waitForEvent(bobSocket, 'conversation_activity');
+
+    const createRes = await createGroup(accessToken, 'Activity Group', [bob._id]);
+    expect(createRes.status).toBe(201);
+
+    const event = await eventPromise;
+    expect(event.conversationId).toBe(createRes.body.data.group.conversation);
+
+    bobSocket.close();
+  });
+
+  it('notifies a member who has not joined the room when the group is renamed', async () => {
+    const { accessToken } = await createTestUser({ name: 'ActivityRenamer' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'ActivityRenamerBob' });
+    const createRes = await createGroup(accessToken, 'Old Activity Name', [bob._id]);
+    const groupId = createRes.body.data.group._id;
+    const conversationId = createRes.body.data.group.conversation;
+
+    const bobSocket = await connectAndAuth(bobToken);
+    // Deliberately not joining the conversation room - conversation_activity
+    // must still reach Bob via his personal userId room.
+    const eventPromise = waitForEvent(bobSocket, 'conversation_activity');
+
+    await request(app)
+      .patch(`/api/groups/${groupId}`)
+      .set('Authorization', auth(accessToken))
+      .send({ name: 'New Activity Name' });
+
+    const event = await eventPromise;
+    expect(event.conversationId).toBe(conversationId);
+
+    bobSocket.close();
+  });
+
+  it('notifies a removed member directly, even though they are no longer in group.members', async () => {
+    const { accessToken } = await createTestUser({ name: 'ActivityRemover' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'ActivityRemoverBob' });
+    const createRes = await createGroup(accessToken, 'Removal Activity Group', [bob._id]);
+    const groupId = createRes.body.data.group._id;
+    const conversationId = createRes.body.data.group.conversation;
+
+    const bobSocket = await connectAndAuth(bobToken);
+    const eventPromise = waitForEvent(bobSocket, 'conversation_activity');
+
+    const res = await request(app)
+      .delete(`/api/groups/${groupId}/members/${bob._id}`)
+      .set('Authorization', auth(accessToken));
+    expect(res.status).toBe(200);
+
+    const event = await eventPromise;
+    expect(event.conversationId).toBe(conversationId);
+
+    bobSocket.close();
+  });
+});
+
 describe('group messaging reuses the existing conversation/message APIs', () => {
   it('supports sending and listing messages in a group conversation with no group-specific code', async () => {
     const { accessToken: creatorToken } = await createTestUser({ name: 'GroupMsg Creator' });
