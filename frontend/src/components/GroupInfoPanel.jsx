@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { searchUsers } from '../api/users.js';
 import {
   getGroup,
@@ -22,18 +22,18 @@ export const GroupInfoPanel = ({ groupId, currentUserId, onClose, onChanged, onL
   const [busy, setBusy] = useState(false);
   const searchTimeout = useRef(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const fresh = await getGroup(groupId);
       setGroup(fresh);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load group.');
     }
-  };
+  }, [groupId]);
 
   useEffect(() => {
     load();
-  }, [groupId]);
+  }, [load]);
 
   useEffect(() => {
     clearTimeout(searchTimeout.current);

@@ -38,11 +38,10 @@ ChatFlow/
 
 ## Status
 
-Backend and frontend are feature-complete: auth, private/group chat, presence,
-typing indicators, read receipts, file/voice messages, a developer dashboard,
-Docker packaging, graceful shutdown, and a TLS-terminating reverse proxy for
-genuine production-mode testing are all built and tested. Remaining work is
-a final acceptance pass (Phase 26).
+Complete. All 26 phases built and verified - see [ACCEPTANCE.md](./ACCEPTANCE.md)
+for the full evidence record, or just run `./scripts/smoke-test.sh` to
+reproduce every check yourself: backend tests, frontend build, both Docker
+topologies (dev and TLS-terminated production mode), all in one script.
 
 ## Running with Docker (recommended)
 
