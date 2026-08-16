@@ -1,10 +1,23 @@
 import { Router } from 'express';
 import * as dashboardController from '../controllers/dashboardController.js';
 import { protect } from '../middlewares/auth.js';
+import { env } from '../config/env.js';
+import { AppError } from '../utils/AppError.js';
 
 const router = Router();
 
 router.use(protect);
+
+// Both simulate routes below deliberately disrupt Redis for every
+// currently-connected client, not just the caller - fine for a local/dev
+// demo of graceful degradation, not something any authenticated user
+// should be able to trigger against a real production deployment.
+const devOnly = (req, res, next) => {
+  if (env.NODE_ENV === 'production') {
+    return next(new AppError('Not available in production', 403, 'FORBIDDEN'));
+  }
+  next();
+};
 
 /**
  * @openapi
@@ -53,5 +66,49 @@ router.use(protect);
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
 router.get('/status', dashboardController.getStatus);
+
+/**
+ * @openapi
+ * /api/dashboard/simulate/redis-down:
+ *   post:
+ *     tags: [Dashboard]
+ *     summary: Disconnect the app's real Redis client, on demand
+ *     description: >
+ *       Dev/demo tooling, not available when NODE_ENV=production. Disconnects
+ *       the actual shared Redis client every part of the app uses (presence,
+ *       caching, rate limiting), so their already-implemented graceful
+ *       degradation becomes observable without needing to stop the real Redis
+ *       process by hand. Auto-reconnect is disabled until
+ *       /api/dashboard/simulate/redis-restore is called.
+ *     responses:
+ *       200:
+ *         description: Redis client disconnected.
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Not available in production.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ */
+router.post('/simulate/redis-down', devOnly, dashboardController.simulateRedisDown);
+
+/**
+ * @openapi
+ * /api/dashboard/simulate/redis-restore:
+ *   post:
+ *     tags: [Dashboard]
+ *     summary: Reconnect Redis after a simulated outage
+ *     description: Dev/demo tooling, not available when NODE_ENV=production. A no-op if Redis wasn't disconnected via the simulate endpoint above.
+ *     responses:
+ *       200:
+ *         description: Redis client reconnected.
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403:
+ *         description: Not available in production.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ */
+router.post('/simulate/redis-restore', devOnly, dashboardController.restoreRedis);
 
 export default router;

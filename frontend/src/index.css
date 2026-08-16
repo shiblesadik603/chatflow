@@ -1073,3 +1073,35 @@ input {
   color: var(--color-text-muted);
   text-align: center;
 }
+
+.failure-simulation {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+}
+
+.failure-simulation span {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.danger-button {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-danger);
+  color: white;
+  font-weight: 600;
+}
+
+.danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

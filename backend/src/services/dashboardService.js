@@ -36,3 +36,38 @@ export const getStatus = async () => {
     counts: { totalUsers, onlineUsers, totalConversations, totalMessages },
   };
 };
+
+// Deliberately operates on the app's real, shared Redis client rather than
+// a fake toggle - every other test/comment in this codebase referencing
+// "Redis is down" behavior (rateLimiter, cacheService, presenceService)
+// means it literally, and the whole point of this pair of functions is to
+// make that same real condition reproducible on demand instead of
+// requiring someone to go stop the actual Redis process by hand. Every
+// other connected client (presence, caching, rate limiting) shares this
+// exact instance, so disconnecting it here means they all genuinely see
+// Redis as down, exactly as if the process had died.
+export const simulateRedisDown = () => {
+  if (redis.status === 'end') {
+    return Promise.resolve({ status: redis.status });
+  }
+  // disconnect() updates redis.status asynchronously (via the socket's own
+  // 'end' event), not the moment this call returns - resolving immediately
+  // after calling it would be a race that reports "ready" for a request
+  // that arrives a few milliseconds too early.  disconnect() (unlike
+  // quit()) also skips a clean QUIT handshake and disables ioredis's own
+  // auto-reconnect - without that second part, it would just silently
+  // reconnect on its own before anyone got to see the "down" state.
+  return new Promise((resolve) => {
+    redis.once('end', () => resolve({ status: redis.status }));
+    redis.disconnect();
+  });
+};
+
+export const restoreRedis = async () => {
+  if (redis.status === 'end') {
+    // connect() throws if called while already connected/connecting, so
+    // this only runs from the exact state simulateRedisDown() leaves it in.
+    await redis.connect();
+  }
+  return { status: redis.status };
+};

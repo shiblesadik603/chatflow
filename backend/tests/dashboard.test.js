@@ -74,3 +74,62 @@ describe('GET /api/dashboard/status', () => {
     expect(after.body.data.counts.totalMessages).toBe(1);
   });
 });
+
+describe('POST /api/dashboard/simulate/redis-down and redis-restore', () => {
+  it('really disconnects and reconnects the app\'s shared Redis client', async () => {
+    const { accessToken, user } = await createTestUser({ name: 'Sim User' });
+
+    const downRes = await request(app)
+      .post('/api/dashboard/simulate/redis-down')
+      .set('Authorization', auth(accessToken));
+    expect(downRes.status).toBe(200);
+    expect(downRes.body.data.status).not.toBe('ready');
+
+    try {
+      // The dashboard's own status check must survive Redis being down
+      // (that's the entire point) and report the real degraded state, not
+      // crash or lie about it.
+      const statusDuringOutage = await request(app)
+        .get('/api/dashboard/status')
+        .set('Authorization', auth(accessToken));
+      expect(statusDuringOutage.status).toBe(200);
+      expect(statusDuringOutage.body.data.redis.status).not.toBe('ready');
+      expect(statusDuringOutage.body.data.mongo.status).toBe('connected');
+
+      // Same real degradation proven with jest.spyOn in userCache.test.js -
+      // here it's the actual disconnected client, not a mocked single call.
+      // getUserById falls back to Mongo and still succeeds.
+      const profileRes = await request(app)
+        .get(`/api/users/${user._id}`)
+        .set('Authorization', auth(accessToken));
+      expect(profileRes.status).toBe(200);
+      expect(profileRes.body.data.user.name).toBe('Sim User');
+    } finally {
+      // Always restore, even if an assertion above throws - this file's
+      // afterAll calls redis.quit(), which needs a live connection, and a
+      // failed assertion here shouldn't leave every later test in this
+      // file (or the teardown itself) running against a dead client.
+      const restoreRes = await request(app)
+        .post('/api/dashboard/simulate/redis-restore')
+        .set('Authorization', auth(accessToken));
+      expect(restoreRes.status).toBe(200);
+      expect(restoreRes.body.data.status).toBe('ready');
+    }
+  });
+
+  it('restoring when already connected is a safe no-op', async () => {
+    const { accessToken } = await createTestUser();
+    const res = await request(app)
+      .post('/api/dashboard/simulate/redis-restore')
+      .set('Authorization', auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('ready');
+  });
+
+  it('requires authentication', async () => {
+    const downRes = await request(app).post('/api/dashboard/simulate/redis-down');
+    expect(downRes.status).toBe(401);
+    const restoreRes = await request(app).post('/api/dashboard/simulate/redis-restore');
+    expect(restoreRes.status).toBe(401);
+  });
+});

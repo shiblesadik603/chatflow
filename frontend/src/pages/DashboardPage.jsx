@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { getDashboardStatus } from '../api/dashboard.js';
+import { getDashboardStatus, simulateRedisDown, restoreRedis } from '../api/dashboard.js';
 
 const POLL_INTERVAL = 5000;
 
@@ -40,6 +40,7 @@ export const DashboardPage = () => {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -60,6 +61,30 @@ export const DashboardPage = () => {
     const interval = setInterval(fetchStatus, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchStatus]);
+
+  const handleSimulateDown = async () => {
+    setIsSimulating(true);
+    try {
+      await simulateRedisDown();
+      await fetchStatus(); // don't wait for the next 5s poll to show it
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to simulate Redis outage.');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setIsSimulating(true);
+    try {
+      await restoreRedis();
+      await fetchStatus();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to restore Redis.');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   if (!status) {
     return <div className="centered-message">{error || 'Loading dashboard...'}</div>;
@@ -93,6 +118,24 @@ export const DashboardPage = () => {
             </div>
           </div>
         </div>
+
+        {status.environment !== 'production' && (
+          <div className="failure-simulation">
+            <span>
+              Disconnects the app's real Redis client on demand, so you can watch presence/caching/rate-limiting
+              degrade gracefully (and recover) without stopping the actual Redis process.
+            </span>
+            {redisHealthy ? (
+              <button type="button" className="danger-button" onClick={handleSimulateDown} disabled={isSimulating}>
+                {isSimulating ? 'Working...' : 'Simulate Redis Down'}
+              </button>
+            ) : (
+              <button type="button" className="create-group-button" onClick={handleRestore} disabled={isSimulating}>
+                {isSimulating ? 'Working...' : 'Restore Redis'}
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="dashboard-section">
