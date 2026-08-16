@@ -4,10 +4,58 @@ import { editMessage, deleteMessage } from '../api/messages.js';
 const formatTime = (isoString) =>
   new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+const formatBytes = (bytes) => {
+  if (!bytes) return '';
+  const units = ['B', 'KB', 'MB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(unitIndex > 0 && value < 10 ? 1 : 0)} ${units[unitIndex]}`;
+};
+
 const MessageTicks = ({ status }) => {
   if (status === 'read') return <span className="message-ticks read" title="Read">✓✓</span>;
   if (status === 'delivered') return <span className="message-ticks" title="Delivered">✓✓</span>;
   return <span className="message-ticks" title="Sent">✓</span>;
+};
+
+const MessageAttachment = ({ message }) => {
+  const attachment = message.attachments?.[0];
+  if (!attachment) return null;
+
+  if (message.messageType === 'image') {
+    return (
+      <div className="message-attachment">
+        <a href={attachment.url} target="_blank" rel="noopener noreferrer">
+          <img src={attachment.url} alt={attachment.fileName || 'Image attachment'} className="message-image" />
+        </a>
+      </div>
+    );
+  }
+
+  if (message.messageType === 'file') {
+    return (
+      <div className="message-attachment">
+        <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="message-file-link">
+          📄 {attachment.fileName}
+          {attachment.size ? <span className="file-size">{formatBytes(attachment.size)}</span> : null}
+        </a>
+      </div>
+    );
+  }
+
+  if (message.messageType === 'voice') {
+    return (
+      <div className="message-attachment">
+        <audio controls src={attachment.url} className="message-audio" />
+      </div>
+    );
+  }
+
+  return null;
 };
 
 export const MessageBubble = ({ message, isOwnMessage }) => {
@@ -92,10 +140,15 @@ export const MessageBubble = ({ message, isOwnMessage }) => {
               </button>
             </div>
           </form>
-        ) : (
+        ) : message.isDeleted ? (
           <div className="message-content">
-            {message.isDeleted ? <em>This message was deleted</em> : message.content}
+            <em>This message was deleted</em>
           </div>
+        ) : (
+          <>
+            <MessageAttachment message={message} />
+            {message.content && <div className="message-content">{message.content}</div>}
+          </>
         )}
 
         {actionError && <div className="message-action-error">{actionError}</div>}

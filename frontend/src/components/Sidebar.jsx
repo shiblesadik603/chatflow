@@ -12,6 +12,18 @@ const conversationLabel = (conversation, currentUserId) => {
   return otherParticipant(conversation, currentUserId)?.name || 'Unknown user';
 };
 
+const ATTACHMENT_LABELS = { image: '📷 Photo', file: '📄 File', voice: '🎤 Voice message' };
+
+// Attachment messages often have no caption at all, so falling back to
+// lastMessage.content the way a text message preview does would just show
+// blank space - a type-based label is the useful fallback here.
+const previewText = (lastMessage) => {
+  if (!lastMessage) return 'No messages yet';
+  if (lastMessage.isDeleted) return 'Message deleted';
+  if (lastMessage.content) return lastMessage.content;
+  return ATTACHMENT_LABELS[lastMessage.messageType] || 'No messages yet';
+};
+
 export const Sidebar = ({ conversations, activeConversationId, onSelectConversation, onConversationCreated }) => {
   const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
@@ -186,11 +198,7 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
               </span>
               <span className="conversation-info">
                 <span className="conversation-name">{conversationLabel(conversation, user._id)}</span>
-                <span className="conversation-preview">
-                  {conversation.lastMessage?.isDeleted
-                    ? 'Message deleted'
-                    : conversation.lastMessage?.content || 'No messages yet'}
-                </span>
+                <span className="conversation-preview">{previewText(conversation.lastMessage)}</span>
               </span>
             </button>
           );

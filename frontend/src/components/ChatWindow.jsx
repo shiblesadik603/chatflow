@@ -153,14 +153,17 @@ export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConvers
   // after the socket it'd emit through is gone.
   useEffect(() => () => clearTimeout(typingStopTimerRef.current), []);
 
-  const handleSend = (content) => {
+  const handleSend = (payload) => {
     setSendError('');
     clearTimeout(typingStopTimerRef.current);
     if (isTypingRef.current) {
       isTypingRef.current = false;
       socket.emit('typing_stop', { conversationId: conversation._id });
     }
-    socket.emit('send_message', { conversationId: conversation._id, content }, (ack) => {
+    // payload is either { messageType: 'text', content } or
+    // { messageType: 'image'|'file'|'voice', content, attachments } from
+    // MessageInput - createMessageSchema accepts the same shape either way.
+    socket.emit('send_message', { conversationId: conversation._id, ...payload }, (ack) => {
       if (!ack.success) {
         setSendError(ack.message || 'Message failed to send.');
       }
