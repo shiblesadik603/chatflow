@@ -1,8 +1,10 @@
+import { jest } from '@jest/globals';
 import http from 'http';
 import request from 'supertest';
 import { io as ioClient } from 'socket.io-client';
 import { app } from '../src/app.js';
 import { initializeSocket } from '../src/sockets/index.js';
+import { redis } from '../src/config/redis.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
 import { clearTestRedis, disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
@@ -154,5 +156,20 @@ describe('presence: online / offline', () => {
       aliceSocketA.close();
       aliceSocketB.close();
     }
+  });
+
+  it('still connects successfully when Redis errors during presence handling', async () => {
+    const { accessToken } = await createTestUser({ name: 'Degraded Presence User' });
+
+    // Same class of failure proven live in Phase 10 (Redis stopped
+    // entirely) - here isolated to a single failing call so the rest of
+    // the suite's shared Redis connection is untouched.
+    const saddSpy = jest.spyOn(redis, 'sadd').mockRejectedValueOnce(new Error('simulated Redis failure'));
+
+    const socket = await connectAndAuth(accessToken); // must not hang or reject
+    expect(socket.connected).toBe(true);
+
+    saddSpy.mockRestore();
+    socket.close();
   });
 });

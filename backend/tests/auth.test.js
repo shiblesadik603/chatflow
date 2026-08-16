@@ -123,6 +123,28 @@ describe('POST /api/auth/refresh', () => {
     expect(res.status).toBe(401);
     expect(res.body.errorCode).toBe('NOT_AUTHENTICATED');
   });
+
+  it('rejects a malformed/tampered refresh token cookie', async () => {
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', 'refreshToken=not-a-real-jwt-at-all');
+    expect(res.status).toBe(401);
+    expect(res.body.errorCode).toBe('INVALID_REFRESH_TOKEN');
+  });
+
+  it('rejects a structurally valid refresh token whose user was deleted', async () => {
+    const agent = request.agent(app);
+    const registerRes = await agent.post('/api/auth/register').send(validUser);
+    const userId = registerRes.body.data.user._id;
+
+    // The token is still valid and still in the DB - only the account
+    // behind it is gone, e.g. deleted through some other admin path.
+    await User.deleteOne({ _id: userId });
+
+    const res = await agent.post('/api/auth/refresh');
+    expect(res.status).toBe(401);
+    expect(res.body.errorCode).toBe('NOT_AUTHENTICATED');
+  });
 });
 
 describe('POST /api/auth/logout', () => {

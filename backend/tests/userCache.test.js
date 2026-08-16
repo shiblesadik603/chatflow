@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { redis } from '../src/config/redis.js';
@@ -61,5 +62,35 @@ describe('public profile caching', () => {
 
     const res = await request(app).get(`/api/users/${user._id}`).set('Authorization', auth(viewerToken));
     expect(res.body.data.user.name).toBe('New Name');
+  });
+
+  it('degrades gracefully to Mongo when Redis errors on read, instead of failing the request', async () => {
+    const { accessToken } = await createTestUser({ name: 'Cache Reader3' });
+    const { user: target } = await createTestUser({ name: 'Degraded Read Target' });
+
+    // Simulates the exact class of failure proven live in Phase 10 (Redis
+    // down) - but as a single, targeted, automated failure instead of
+    // actually taking the shared test connection down for every other test
+    // in the suite.
+    const getSpy = jest.spyOn(redis, 'get').mockRejectedValueOnce(new Error('simulated Redis read failure'));
+
+    const res = await request(app).get(`/api/users/${target._id}`).set('Authorization', auth(accessToken));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.name).toBe('Degraded Read Target');
+    getSpy.mockRestore();
+  });
+
+  it('degrades gracefully when Redis errors on write - the response still succeeds', async () => {
+    const { accessToken } = await createTestUser({ name: 'Cache Reader4' });
+    const { user: target } = await createTestUser({ name: 'Degraded Write Target' });
+
+    const setSpy = jest.spyOn(redis, 'set').mockRejectedValueOnce(new Error('simulated Redis write failure'));
+
+    const res = await request(app).get(`/api/users/${target._id}`).set('Authorization', auth(accessToken));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.name).toBe('Degraded Write Target');
+    setSpy.mockRestore();
   });
 });

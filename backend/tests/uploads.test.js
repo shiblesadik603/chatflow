@@ -217,4 +217,44 @@ describe('POST /api/uploads/chat', () => {
     expect(messageRes.status).toBe(201);
     expect(messageRes.body.data.message.attachments[0].url).toBe(uploadRes.body.data.url);
   });
+
+  it('rejects unrecognizable binary data claiming to be a document (not plausibly text either)', async () => {
+    const { accessToken } = await createTestUser();
+    // Random bytes including null bytes - not a recognized document
+    // format, and not plausibly plain text either (the fallback in
+    // fileValidation.js requires no null bytes to accept it as text).
+    const garbage = Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x00, 0x10, 0x20, 0x00]);
+
+    const res = await request(app)
+      .post('/api/uploads/chat')
+      .set('Authorization', auth(accessToken))
+      .field('type', 'document')
+      .attach('file', garbage, 'mystery.bin');
+
+    expect(res.status).toBe(400);
+    expect(res.body.errorCode).toBe('INVALID_FILE_TYPE');
+  });
+});
+
+describe('storageService.deleteFileByUrl edge cases', () => {
+  it('is a no-op for a URL that is not one of our own local files', async () => {
+    const { deleteFileByUrl } = await import('../src/services/storageService.js');
+    // Should resolve without throwing, even though this was never saved.
+    await expect(deleteFileByUrl('https://cdn.example.com/some-other-file.png')).resolves.toBeUndefined();
+  });
+
+  it('is a no-op for an empty/missing URL', async () => {
+    const { deleteFileByUrl } = await import('../src/services/storageService.js');
+    await expect(deleteFileByUrl('')).resolves.toBeUndefined();
+    await expect(deleteFileByUrl(undefined)).resolves.toBeUndefined();
+  });
+
+  it('silently succeeds when the file is already gone (ENOENT is swallowed)', async () => {
+    const { deleteFileByUrl } = await import('../src/services/storageService.js');
+    const { env } = await import('../src/config/env.js');
+    // A well-formed URL under our own uploads path, but nothing was ever
+    // written at this filename.
+    const neverExisted = `${env.PUBLIC_URL}/uploads/00000000-0000-0000-0000-000000000000.png`;
+    await expect(deleteFileByUrl(neverExisted)).resolves.toBeUndefined();
+  });
 });
