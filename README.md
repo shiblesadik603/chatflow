@@ -40,8 +40,9 @@ ChatFlow/
 
 Backend and frontend are feature-complete: auth, private/group chat, presence,
 typing indicators, read receipts, file/voice messages, a developer dashboard,
-and Docker packaging (this section) are all built and tested. Remaining work
-is production-hardening and a final acceptance pass (Phases 25-26).
+Docker packaging, graceful shutdown, and a TLS-terminating reverse proxy for
+genuine production-mode testing are all built and tested. Remaining work is
+a final acceptance pass (Phase 26).
 
 ## Running with Docker (recommended)
 
@@ -64,8 +65,25 @@ Data persists across restarts (named volumes for Mongo/Redis/uploads).
 
 > Runs with `NODE_ENV=development` semantics even inside containers - the
 > refresh-token cookie's `secure` flag requires real HTTPS, which this local
-> Compose stack doesn't terminate. Production TLS/proxy setup is a separate,
-> later concern (Phase 25), not part of "does the app run in containers."
+> Compose stack doesn't terminate. See "Running in Production Mode" below
+> for the topology that actually exercises that.
+
+## Running in Production Mode (TLS-terminated)
+
+Layers an nginx reverse proxy in front of the same stack, terminating HTTPS
+so `NODE_ENV=production` can actually run correctly - the refresh-token
+cookie's `secure` flag only gets sent by the browser over real TLS.
+
+```bash
+./proxy/generate-cert.sh   # one-time: self-signed cert for local testing
+                            # (browsers will warn about it - that's correct
+                            # behavior for a cert nothing has vouched for)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+```
+
+- App: https://localhost (plain http:// redirects to https://)
+- Backend and frontend are no longer directly published - only the proxy is,
+  same as a real deployment where bypassing it would mean bypassing TLS.
 
 ## Running Locally, Without Docker
 

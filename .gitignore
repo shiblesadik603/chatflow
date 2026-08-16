@@ -9,3 +9,4 @@ coverage/
 .claude/
 uploads/
 uploads-test/
+proxy/certs/*.pem

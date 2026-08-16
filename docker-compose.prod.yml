@@ -1,0 +1,43 @@
+# Layers on top of docker-compose.yml: `docker compose -f docker-compose.yml
+# -f docker-compose.prod.yml up --build`. Kept as a separate override
+# rather than a single compose file with profiles, so the base file stays
+# the simple, direct-port-access dev setup (the one Phase 24 already
+# verified) and this one only has to describe what's *different* about a
+# production-shaped topology: TLS termination, NODE_ENV=production, and a
+# single public entry point instead of two directly-exposed ports.
+services:
+  backend:
+    environment:
+      NODE_ENV: production
+      # nginx (the proxy service below) sits directly in front of this
+      # container - exactly one hop - so Express should trust exactly one
+      # X-Forwarded-For entry (app.js's TRUST_PROXY comment explains why
+      # getting this number wrong in either direction breaks rate limiting).
+      TRUST_PROXY: 1
+      # Both browser-facing, matching the proxy's public address rather
+      # than any container-internal hostname - see docker-compose.yml's
+      # existing comments on CLIENT_URL/PUBLIC_URL for why.
+      CLIENT_URL: https://localhost
+      PUBLIC_URL: https://localhost
+    # Only the proxy is meant to be reachable directly in this topology -
+    # bypassing it would mean bypassing TLS entirely, defeating the point.
+    ports: !reset []
+
+  frontend:
+    build:
+      args:
+        VITE_API_URL: https://localhost
+    ports: !reset []
+
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./proxy/certs:/etc/nginx/certs:ro
