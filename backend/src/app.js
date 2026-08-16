@@ -13,6 +13,8 @@ import userRoutes from './routes/userRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import groupRoutes from './routes/groupRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
+import { UPLOAD_DIR } from './services/storageService.js';
 
 export const app = express();
 
@@ -38,6 +40,19 @@ app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/uploads', uploadRoutes);
+
+// Serves uploaded files back out. Helmet's default
+// Cross-Origin-Resource-Policy: same-origin would otherwise block the
+// frontend (a different origin in dev) from displaying these in an <img>
+// tag - that's a separate browser mechanism from CORS, not covered by the
+// cors() middleware above.
+app.use(
+  '/uploads',
+  express.static(UPLOAD_DIR, {
+    setHeaders: (res) => res.set('Cross-Origin-Resource-Policy', 'cross-origin'),
+  })
+);
 
 // More feature routes are mounted here in later phases.
 

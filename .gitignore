@@ -7,3 +7,5 @@ build/
 coverage/
 .DS_Store
 .claude/
+uploads/
+uploads-test/

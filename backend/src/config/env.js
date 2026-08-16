@@ -11,6 +11,11 @@ const envSchema = z.object({
   REFRESH_TOKEN_SECRET: z.string().min(32, 'REFRESH_TOKEN_SECRET should be at least 32 characters'),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default('30d'),
   REDIS_URL: z.string().default('redis://127.0.0.1:6379'),
+  // Base URL this server is reachable at - used to build absolute URLs for
+  // uploaded files (e.g. http://localhost:5001/uploads/<file>). In
+  // production this would be the real API domain.
+  PUBLIC_URL: z.string().url().default('http://localhost:5001'),
+  UPLOAD_DIR: z.string().default('uploads'),
 });
 
 const parsed = envSchema.safeParse(process.env);
