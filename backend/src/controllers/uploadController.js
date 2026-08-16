@@ -43,6 +43,9 @@ export const uploadChatFile = async (req, res, next) => {
         fileName: sanitizeFileName(req.file.originalname),
         mimeType,
         size: req.file.size,
+        // Only present for voice uploads - the client-reported recording
+        // length, already validated by uploadTypeSchema.
+        ...(req.body.type === 'voice' ? { duration: req.body.duration } : {}),
       },
     });
   } catch (err) {

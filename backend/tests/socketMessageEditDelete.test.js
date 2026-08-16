@@ -70,6 +70,64 @@ const waitForEvent = (socket, event, ms = 500) =>
     });
   });
 
+describe('REST message creation broadcasting over Socket.IO', () => {
+  // Regression test: POST /api/conversations/:id/messages originally only
+  // broadcast new_message when sent through the socket's send_message
+  // event (Phase 8) - the plain REST path silently never announced a new
+  // message to anyone else's live connection. Caught manually while
+  // testing voice messages (Phase 15) sent over REST, not sockets.
+  it('broadcasts new_message when a message is created over plain REST, not just via the socket event', async () => {
+    const { accessToken: aliceToken } = await createTestUser({ name: 'Alice RestSend' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'Bob RestSend' });
+    const conversationId = await createConversation(aliceToken, bob._id);
+
+    const aliceSocket = await connectAndAuth(aliceToken);
+    const bobSocket = await connectAndAuth(bobToken);
+    await emitWithAck(aliceSocket, 'join_conversation', { conversationId });
+    await emitWithAck(bobSocket, 'join_conversation', { conversationId });
+
+    const bobEventPromise = waitForEvent(bobSocket, 'new_message');
+
+    const res = await request(app)
+      .post(`/api/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${aliceToken}`)
+      .send({ content: 'Sent over plain REST, not send_message' });
+    expect(res.status).toBe(201);
+
+    const bobEvent = await bobEventPromise;
+    expect(bobEvent.content).toBe('Sent over plain REST, not send_message');
+
+    aliceSocket.close();
+    bobSocket.close();
+  });
+
+  it('does not re-broadcast a REST idempotent retry with the same clientMessageId', async () => {
+    const { accessToken: aliceToken } = await createTestUser({ name: 'Alice RestRetry' });
+    const { accessToken: bobToken, user: bob } = await createTestUser({ name: 'Bob RestRetry' });
+    const conversationId = await createConversation(aliceToken, bob._id);
+
+    const bobSocket = await connectAndAuth(bobToken);
+    await emitWithAck(bobSocket, 'join_conversation', { conversationId });
+    const received = [];
+    bobSocket.on('new_message', (msg) => received.push(msg));
+
+    const body = { content: 'Once only', clientMessageId: 'rest-retry-1' };
+    await request(app)
+      .post(`/api/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${aliceToken}`)
+      .send(body);
+    await request(app)
+      .post(`/api/conversations/${conversationId}/messages`)
+      .set('Authorization', `Bearer ${aliceToken}`)
+      .send(body);
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(received).toHaveLength(1);
+
+    bobSocket.close();
+  });
+});
+
 describe('REST edit/delete broadcasting over Socket.IO', () => {
   it('broadcasts message_edited to everyone in the conversation room', async () => {
     const { accessToken: aliceToken } = await createTestUser({ name: 'Alice Broadcast' });

@@ -8,6 +8,17 @@ export const createMessage = async (req, res, next) => {
       req.params.conversationId,
       req.body
     );
+
+    if (created) {
+      // Real-time delivery has to work the same way regardless of which
+      // transport created the message - a client sending over REST
+      // shouldn't produce a "quieter" message than one sent over the
+      // socket's send_message event. Mirrors the same `created` guard
+      // used there: an idempotent retry (created: false) was already
+      // broadcast the first time and doesn't need a second announcement.
+      getIO().to(message.conversation.toString()).emit('new_message', message);
+    }
+
     res.status(created ? 201 : 200).json({ success: true, data: { message } });
   } catch (err) {
     next(err);

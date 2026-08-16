@@ -1,14 +1,27 @@
+import http from 'http';
 import fs from 'fs/promises';
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { initializeSocket } from '../src/sockets/index.js';
 import { UPLOAD_DIR } from '../src/services/storageService.js';
 import { connectTestDB, clearTestDB, disconnectTestDB } from './utils/testDb.js';
 import { disconnectTestRedis } from './utils/testRedis.js';
 import { createTestUser } from './utils/authHelpers.js';
 
-beforeAll(connectTestDB);
+let httpServer;
+
+beforeAll(async () => {
+  await connectTestDB();
+  // Message creation broadcasts over Socket.IO now (see messageController.js),
+  // so getIO() needs a real Server instance even though this file's tests
+  // only exercise the REST layer.
+  httpServer = http.createServer(app);
+  initializeSocket(httpServer);
+  await new Promise((resolve) => httpServer.listen(0, resolve));
+});
 afterEach(clearTestDB);
 afterAll(async () => {
+  await new Promise((resolve) => httpServer.close(resolve));
   await disconnectTestRedis();
   await disconnectTestDB();
   await fs.rm(UPLOAD_DIR, { recursive: true, force: true }); // uploads-test/, never the real uploads/

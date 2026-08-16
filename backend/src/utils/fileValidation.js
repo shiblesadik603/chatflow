@@ -15,6 +15,22 @@ const DOCUMENT_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
+// video/webm is deliberately included here: WebM is a shared container
+// format for both audio and video, and a magic-number sniffer that (like
+// file-type) doesn't parse the track list can't always tell an audio-only
+// MediaRecorder recording apart from a video file at the container level.
+// The browser reports the Blob's type as "audio/webm", but the underlying
+// bytes can be indistinguishable from "video/webm" to this kind of check.
+const AUDIO_TYPES = new Set([
+  'audio/webm',
+  'video/webm',
+  'audio/ogg',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/wav',
+  'audio/aac',
+]);
+
 const EXTENSIONS_BY_MIME = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -23,6 +39,19 @@ const EXTENSIONS_BY_MIME = {
   'application/pdf': '.pdf',
   'application/msword': '.doc',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'audio/webm': '.webm',
+  'video/webm': '.webm',
+  'audio/ogg': '.ogg',
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/wav': '.wav',
+  'audio/aac': '.aac',
+};
+
+const ALLOWED_TYPES_BY_CATEGORY = {
+  image: IMAGE_TYPES,
+  document: DOCUMENT_TYPES,
+  voice: AUDIO_TYPES,
 };
 
 // Never trust the client's declared MIME type (req.file.mimetype) alone -
@@ -32,7 +61,7 @@ const EXTENSIONS_BY_MIME = {
 // that detected type - never the claimed one - is what gets used from
 // here on for the allowlist check and the stored file's extension.
 export const validateFileContent = async (buffer, category) => {
-  const allowed = category === 'document' ? DOCUMENT_TYPES : IMAGE_TYPES;
+  const allowed = ALLOWED_TYPES_BY_CATEGORY[category] || IMAGE_TYPES;
 
   const detected = await fileTypeFromBuffer(buffer);
 
