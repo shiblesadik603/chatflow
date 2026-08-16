@@ -16,6 +16,15 @@ const envSchema = z.object({
   // production this would be the real API domain.
   PUBLIC_URL: z.string().url().default('http://localhost:5001'),
   UPLOAD_DIR: z.string().default('uploads'),
+  // All three optional, and all-or-nothing in practice (storageService.js
+  // only switches to Cloudinary when CLOUDINARY_CLOUD_NAME is set) - local
+  // dev keeps working against disk with zero Cloudinary account needed;
+  // a real deployment (Render, etc.) sets these and gets a shared,
+  // CDN-backed store that survives redeploys instead of an ephemeral
+  // filesystem.
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
   // Number of reverse-proxy hops to trust for req.ip (see app.js). 0 = no
   // proxy, use the raw connection address - correct for local dev.
   TRUST_PROXY: z.coerce.number().int().nonnegative().default(0),

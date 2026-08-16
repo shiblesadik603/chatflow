@@ -1,28 +1,46 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 import { env } from '../config/env.js';
 
-// --- Local disk now, Cloudinary/S3 in production ---
+// --- Local disk for development, Cloudinary once configured ---
 //
 // Every other part of the app only ever calls saveFile()/deleteFileByUrl()
-// from this module - never touches fs directly. That's what makes the
-// production swap painless: replace the two functions below with calls to
-// the Cloudinary/S3 SDK (which take a buffer and return a URL, same
-// shape), and nothing in uploadController.js has to change.
+// from this module - never touches fs directly. That's what makes this
+// swap painless: both functions branch internally on whether Cloudinary
+// credentials are present, so uploadController.js never has to change and
+// local dev keeps working with zero Cloudinary account needed.
 //
 // Why not local disk in production? A few reasons that matter once you
-// have more than one server: (1) uploaded files would only exist on
-// whichever instance handled that request - a second instance serving a
-// later request for the same file would 404. (2) redeploying (most
-// platforms) wipes the filesystem. (3) no CDN, so every image request
-// round-trips to your own server instead of an edge location near the
-// user. Cloudinary/S3 solve all three: one shared store any instance can
-// read from, survives deploys, and usually ships with CDN delivery built in.
+// deploy: (1) most free/managed hosts (Render, etc.) wipe the filesystem on
+// every redeploy or restart - uploaded files vanish. (2) a second instance
+// serving a later request for the same file would 404. (3) no CDN, so every
+// image request round-trips to your own server instead of an edge location
+// near the user. Cloudinary solves all three.
+
+const useCloudinary = Boolean(env.CLOUDINARY_CLOUD_NAME);
+
+if (useCloudinary) {
+  cloudinary.config({
+    cloud_name: env.CLOUDINARY_CLOUD_NAME,
+    api_key: env.CLOUDINARY_API_KEY,
+    api_secret: env.CLOUDINARY_API_SECRET,
+  });
+}
 
 export const UPLOAD_DIR = path.resolve(process.cwd(), env.UPLOAD_DIR);
 
-export const saveFile = async (buffer, extension) => {
+const saveToCloudinary = (buffer, extension) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: 'auto', folder: 'chatflow', format: extension.replace('.', '') },
+      (error, result) => (error ? reject(error) : resolve({ url: result.secure_url }))
+    );
+    stream.end(buffer);
+  });
+
+const saveToDisk = async (buffer, extension) => {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
   // Always a server-generated name, never the client's original filename -
@@ -30,10 +48,28 @@ export const saveFile = async (buffer, extension) => {
   const filename = `${crypto.randomUUID()}${extension}`;
   await fs.writeFile(path.join(UPLOAD_DIR, filename), buffer);
 
-  return { url: `${env.PUBLIC_URL}/uploads/${filename}`, filename };
+  return { url: `${env.PUBLIC_URL}/uploads/${filename}` };
 };
 
-export const deleteFileByUrl = async (url) => {
+export const saveFile = (buffer, extension) =>
+  useCloudinary ? saveToCloudinary(buffer, extension) : saveToDisk(buffer, extension);
+
+// Matches the public_id (including any folder prefix) out of a Cloudinary
+// delivery URL, e.g. .../upload/v1234/chatflow/abc123.jpg -> chatflow/abc123
+const CLOUDINARY_PUBLIC_ID_RE = /\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/;
+
+const deleteFromCloudinary = async (url) => {
+  const match = url && url.match(CLOUDINARY_PUBLIC_ID_RE);
+  if (!match) return;
+  try {
+    // Only ever called for avatars (see uploadController.js), always images.
+    await cloudinary.uploader.destroy(match[1], { resource_type: 'image' });
+  } catch {
+    // best-effort - a failed cleanup shouldn't surface anywhere
+  }
+};
+
+const deleteFromDisk = async (url) => {
   if (!url || !url.startsWith(`${env.PUBLIC_URL}/uploads/`)) {
     return; // not one of our local files (or empty) - nothing to clean up
   }
@@ -46,3 +82,5 @@ export const deleteFileByUrl = async (url) => {
     if (err.code !== 'ENOENT') throw err; // already gone is fine, anything else isn't
   }
 };
+
+export const deleteFileByUrl = (url) => (useCloudinary ? deleteFromCloudinary(url) : deleteFromDisk(url));

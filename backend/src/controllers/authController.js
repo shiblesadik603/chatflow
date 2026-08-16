@@ -7,7 +7,11 @@ const REFRESH_COOKIE_NAME = 'refreshToken';
 const refreshCookieOptions = () => ({
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  // 'lax' blocks the cookie on cross-site fetch/XHR (only top-level nav gets
+  // it), which breaks refresh once frontend and backend are on different
+  // origins (e.g. Vercel + Render) - 'none' is required there, and only
+  // valid alongside Secure, hence gating on production the same as above.
+  sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
   // Only sent back to auth endpoints, not every request to the API.
   path: '/api/auth',
   maxAge: msFromDuration(env.REFRESH_TOKEN_EXPIRES_IN),
