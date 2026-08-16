@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
 import { ChatPage } from './pages/ChatPage.jsx';
+import { DashboardPage } from './pages/DashboardPage.jsx';
 
 function App() {
   return (
@@ -19,6 +20,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ChatPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
                 </ProtectedRoute>
               }
             />

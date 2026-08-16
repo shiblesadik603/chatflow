@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { searchUsers } from '../api/users.js';
 import { createConversation } from '../api/conversations.js';
@@ -108,9 +109,12 @@ export const Sidebar = ({ conversations, activeConversationId, onSelectConversat
           <Avatar name={user.name} avatarUrl={user.avatar} />
           <span>{user.name}</span>
         </button>
-        <button className="link-button" onClick={logout}>
-          Log out
-        </button>
+        <div className="sidebar-header-actions">
+          <Link to="/dashboard" className="link-button">Dashboard</Link>
+          <button className="link-button" onClick={logout}>
+            Log out
+          </button>
+        </div>
       </div>
 
       {isProfileOpen && <ProfilePanel onClose={() => setIsProfileOpen(false)} />}

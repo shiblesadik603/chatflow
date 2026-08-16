@@ -17,6 +17,7 @@ import conversationRoutes from './routes/conversationRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import groupRoutes from './routes/groupRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 import { UPLOAD_DIR } from './services/storageService.js';
 
 export const app = express();
@@ -97,6 +98,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Serves uploaded files back out. Helmet's default
 // Cross-Origin-Resource-Policy: same-origin would otherwise block the
