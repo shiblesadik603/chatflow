@@ -13,6 +13,15 @@ export const ChatPage = () => {
   const refreshConversations = useCallback(async () => {
     const list = await listConversations();
     setConversations(list);
+    // Keeps the currently-open conversation's own data (name, participants,
+    // group membership) in sync too - conversations only updates the list,
+    // and activeConversation is a separate piece of state that would
+    // otherwise keep showing whatever it was set to when first opened
+    // (e.g. a group's old name after an admin renames it). If it's no
+    // longer in the list at all, this user is no longer a participant
+    // (e.g. just got removed from the group) - clear it rather than leave
+    // a conversation open that every further action would 403 on.
+    setActiveConversation((prev) => (prev ? list.find((c) => c._id === prev._id) ?? null : prev));
     return list;
   }, []);
 
@@ -77,7 +86,14 @@ export const ChatPage = () => {
         onSelectConversation={setActiveConversation}
         onConversationCreated={handleConversationCreated}
       />
-      <ChatWindow conversation={activeConversation} />
+      <ChatWindow
+        conversation={activeConversation}
+        onConversationsChanged={refreshConversations}
+        onLeftConversation={() => {
+          setActiveConversation(null);
+          refreshConversations();
+        }}
+      />
     </div>
   );
 };

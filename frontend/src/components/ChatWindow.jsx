@@ -4,6 +4,7 @@ import { useSocket } from '../context/SocketContext.jsx';
 import { listMessages } from '../api/messages.js';
 import { MessageBubble } from './MessageBubble.jsx';
 import { MessageInput } from './MessageInput.jsx';
+import { GroupInfoPanel } from './GroupInfoPanel.jsx';
 
 const conversationTitle = (conversation, currentUserId) => {
   if (conversation.type === 'group') return conversation.group?.name || 'Group';
@@ -12,13 +13,14 @@ const conversationTitle = (conversation, currentUserId) => {
 
 const TYPING_STOP_DELAY = 2000;
 
-export const ChatWindow = ({ conversation }) => {
+export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConversation }) => {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [sendError, setSendError] = useState('');
   const [typingUserIds, setTypingUserIds] = useState([]);
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const messagesEndRef = useRef(null);
   // Tracks whether *this* client has already told the room it's typing, so
   // typing_start only fires once per burst of keystrokes instead of on
@@ -190,8 +192,26 @@ export const ChatWindow = ({ conversation }) => {
     <div className="chat-window">
       <header className="chat-header">
         <h2>{conversationTitle(conversation, user._id)}</h2>
+        {conversation.type === 'group' && (
+          <button type="button" className="link-button" onClick={() => setIsGroupInfoOpen(true)}>
+            Group Info
+          </button>
+        )}
         {!isConnected && <span className="connection-warning">Reconnecting...</span>}
       </header>
+
+      {isGroupInfoOpen && conversation.group && (
+        <GroupInfoPanel
+          groupId={conversation.group._id}
+          currentUserId={user._id}
+          onClose={() => setIsGroupInfoOpen(false)}
+          onChanged={onConversationsChanged}
+          onLeft={() => {
+            setIsGroupInfoOpen(false);
+            onLeftConversation?.();
+          }}
+        />
+      )}
 
       <div className="message-list">
         {isLoadingHistory && <div className="centered-message">Loading messages...</div>}
