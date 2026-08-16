@@ -23,6 +23,12 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  // A brief settle window: a test's socket.close() calls trigger the
+  // server's async 'disconnect' handler (which now includes a Redis call
+  // via presenceHandlers.js), but nothing in the test awaits that
+  // handler's completion. Tearing down Redis while it's still in flight
+  // throws "Connection is closed" as an unhandled rejection.
+  await new Promise((resolve) => setTimeout(resolve, 200));
   await clearTestDB();
   await clearTestRedis();
 });
@@ -102,39 +108,51 @@ describe('presence: online / offline', () => {
     await createConversation(aliceToken, bob._id);
 
     const bobSocket = await connectAndAuth(bobToken);
+    // Attached before either of Alice's connections exist, not after -
+    // Socket.IO doesn't buffer a custom event for a listener that gets
+    // attached later. If aliceSocketA's user_online broadcast is sent (and
+    // possibly arrives) before this listener exists, it's silently lost,
+    // not queued.
     const onlineEvents = collectEvents(bobSocket, 'user_online');
     const offlineEvents = collectEvents(bobSocket, 'user_offline');
 
-    // Alice opens two devices/tabs.
     const aliceSocketA = await connectAndAuth(aliceToken);
     const aliceSocketB = await connectAndAuth(aliceToken);
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(onlineEvents).toHaveLength(1); // only the first connection triggers a broadcast
-    expect(onlineEvents[0]).toEqual({ userId: alice._id });
+    // try/finally: if an assertion below throws, these sockets must still
+    // close - an assertion failure leaving a connection open once hung
+    // afterAll's httpServer.close() for the entire file (it waits for
+    // existing connections to end).
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(onlineEvents).toHaveLength(1); // only the first connection triggers a broadcast
+      expect(onlineEvents[0]).toEqual({ userId: alice._id });
 
-    // Close one of the two - Alice should still be considered online.
-    aliceSocketA.close();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(offlineEvents).toHaveLength(0);
+      // Close one of the two - Alice should still be considered online.
+      aliceSocketA.close();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(offlineEvents).toHaveLength(0);
 
-    const stillOnlineRes = await request(app)
-      .get(`/api/users/${alice._id}`)
-      .set('Authorization', `Bearer ${bobToken}`);
-    expect(stillOnlineRes.body.data.user.isOnline).toBe(true);
+      const stillOnlineRes = await request(app)
+        .get(`/api/users/${alice._id}`)
+        .set('Authorization', `Bearer ${bobToken}`);
+      expect(stillOnlineRes.body.data.user.isOnline).toBe(true);
 
-    // Close the last remaining socket - now Alice actually goes offline.
-    aliceSocketB.close();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(offlineEvents).toHaveLength(1);
-    expect(offlineEvents[0].userId).toBe(alice._id);
+      // Close the last remaining socket - now Alice actually goes offline.
+      aliceSocketB.close();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(offlineEvents).toHaveLength(1);
+      expect(offlineEvents[0].userId).toBe(alice._id);
 
-    const offlineRes = await request(app)
-      .get(`/api/users/${alice._id}`)
-      .set('Authorization', `Bearer ${bobToken}`);
-    expect(offlineRes.body.data.user.isOnline).toBe(false);
-    expect(new Date(offlineRes.body.data.user.lastSeen).getTime()).toBeGreaterThan(Date.now() - 5000);
-
-    bobSocket.close();
+      const offlineRes = await request(app)
+        .get(`/api/users/${alice._id}`)
+        .set('Authorization', `Bearer ${bobToken}`);
+      expect(offlineRes.body.data.user.isOnline).toBe(false);
+      expect(new Date(offlineRes.body.data.user.lastSeen).getTime()).toBeGreaterThan(Date.now() - 5000);
+    } finally {
+      bobSocket.close();
+      aliceSocketA.close();
+      aliceSocketB.close();
+    }
   });
 });

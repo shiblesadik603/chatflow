@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError.js';
 import { validateFileContent } from '../utils/fileValidation.js';
 import { sanitizeFileName } from '../utils/sanitizeFileName.js';
 import { saveFile, deleteFileByUrl } from '../services/storageService.js';
+import { invalidateProfileCache } from '../services/cacheService.js';
 
 export const uploadAvatar = async (req, res, next) => {
   try {
@@ -15,6 +16,7 @@ export const uploadAvatar = async (req, res, next) => {
 
     const previousAvatar = req.user.avatar;
     const user = await User.findByIdAndUpdate(req.user._id, { avatar: url }, { new: true });
+    await invalidateProfileCache(req.user._id); // avatar just changed - stale cached snapshot otherwise
 
     // Best-effort cleanup of the old file - never let this fail the request.
     if (previousAvatar) {

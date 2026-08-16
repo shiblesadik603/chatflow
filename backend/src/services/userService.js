@@ -1,21 +1,35 @@
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
 import { escapeRegex } from '../utils/escapeRegex.js';
+import { getCachedProfile, setCachedProfile, invalidateProfileCache } from './cacheService.js';
 
 // What a user is allowed to see about *someone else* - deliberately
 // excludes email and blockedUsers, unlike a user's own /me profile.
 const PUBLIC_PROFILE_FIELDS = 'name avatar bio isOnline lastSeen';
 
+// Cache-aside: check Redis first, fall back to Mongo on a miss (or a
+// Redis error), then populate the cache for next time. See
+// cacheService.js for why this endpoint specifically, and what isn't
+// cached this way.
 export const getPublicProfile = async (userId) => {
+  const cached = await getCachedProfile(userId);
+  if (cached) return cached;
+
   const user = await User.findById(userId).select(PUBLIC_PROFILE_FIELDS);
   if (!user) {
     throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
-  return user;
+
+  const profile = user.toJSON();
+  await setCachedProfile(userId, profile);
+  return profile;
 };
 
-export const updateProfile = async (userId, updates) =>
-  User.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
+export const updateProfile = async (userId, updates) => {
+  const user = await User.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
+  await invalidateProfileCache(userId); // name/bio just changed - the cached snapshot is stale now
+  return user;
+};
 
 export const searchUsers = async (currentUserId, query) => {
   const currentUser = await User.findById(currentUserId).select('blockedUsers');
