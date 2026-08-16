@@ -14,6 +14,19 @@ export const setAccessToken = (token) => {
 };
 export const getAccessToken = () => accessToken;
 
+// Tracks which user *this tab* believes it's logged in as, so a silent
+// refresh (below) can detect when it silently comes back as someone else.
+// That happens when two accounts share one browser: the httpOnly refresh
+// cookie is per-origin, not per-tab, so whichever account logged in most
+// recently anywhere in this browser owns the cookie. Without this check, a
+// tab whose own access token expires would silently start acting as that
+// other account instead of erroring - a real identity mix-up, not just a
+// stale-UI problem.
+let currentUserId = null;
+export const setCurrentUserId = (id) => {
+  currentUserId = id;
+};
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   withCredentials: true, // sends/receives the httpOnly refresh cookie
@@ -38,12 +51,22 @@ let refreshPromise = null;
 // would race multiple rotations against the same refresh token and only
 // one could win. Sharing one in-flight promise means the second and third
 // callers just await the first call's result instead of starting their own.
-const refreshAccessToken = () => {
+export const refreshAccessToken = () => {
   if (!refreshPromise) {
     refreshPromise = refreshClient
       .post('/api/auth/refresh')
       .then((res) => {
-        const token = res.data.data.accessToken;
+        const { accessToken: token, user } = res.data.data;
+        // currentUserId is only null before any user has ever been
+        // established in this tab (e.g. AuthContext's restoreSession call
+        // uses a separate path and hasn't set it yet) - nothing to compare
+        // against yet, so any identity is accepted. Once a user IS known,
+        // a mismatch means the shared cookie now belongs to a different
+        // account, and adopting it silently would mean this tab starts
+        // acting as that other person without any explicit login.
+        if (currentUserId && user._id !== currentUserId) {
+          throw new Error('IDENTITY_MISMATCH');
+        }
         setAccessToken(token);
         return token;
       })
@@ -61,6 +84,10 @@ let onAuthFailure = () => {};
 export const setOnAuthFailure = (handler) => {
   onAuthFailure = handler;
 };
+// Lets other modules (SocketContext's own expired-token reconnect path)
+// trigger the same logout AuthContext registered here, without each of
+// them needing their own copy of "what does a failed session mean".
+export const triggerAuthFailure = () => onAuthFailure();
 
 apiClient.interceptors.response.use(
   (res) => res,

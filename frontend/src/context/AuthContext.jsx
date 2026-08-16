@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as authApi from '../api/auth.js';
-import { setAccessToken, setOnAuthFailure } from '../api/client.js';
+import { setAccessToken, setCurrentUserId, setOnAuthFailure } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -35,8 +35,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Wired up once, here, so a token-refresh failure anywhere in the app
     // (any API call, not just ones this component triggers) logs the user
-    // out and clears state consistently.
-    setOnAuthFailure(() => setUser(null));
+    // out and clears state consistently. Also covers an identity mismatch
+    // (client.js's refreshAccessToken) - the stale token isn't just
+    // expired at that point, it's actively the wrong account, so it's
+    // cleared rather than left around for the next request to resend.
+    setOnAuthFailure(() => {
+      setAccessToken(null);
+      setCurrentUserId(null);
+      setUser(null);
+    });
   }, []);
 
   const login = useCallback(async (credentials) => {

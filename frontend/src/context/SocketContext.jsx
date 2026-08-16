@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { getAccessToken } from '../api/client.js';
-import * as authApi from '../api/auth.js';
+import { getAccessToken, refreshAccessToken, triggerAuthFailure } from '../api/client.js';
 import { useAuth } from './AuthContext.jsx';
 
 const SocketContext = createContext(null);
@@ -33,20 +32,23 @@ export const SocketProvider = ({ children }) => {
 
     // The access token is short-lived (15 min, Phase 3) and this
     // connection can easily outlive one - if the socket handshake fails
-    // because the token expired, get a fresh one via the same silent
-    // refresh AuthContext uses on load, then retry the connection with it
-    // instead of leaving the socket stuck retrying with a token that will
-    // never become valid again.
+    // because the token expired, get a fresh one via the same
+    // identity-checked refresh the HTTP client uses (client.js's
+    // refreshAccessToken, not authApi.restoreSession - that second one
+    // skips the check on purpose for the initial page-load case, which
+    // would let this reconnect silently adopt a different account's
+    // identity if another account's login currently owns the shared
+    // refresh cookie), then retry the connection with it.
     s.on('connect_error', async (err) => {
       if (err.data?.code === 'TOKEN_EXPIRED') {
         try {
-          await authApi.restoreSession();
+          await refreshAccessToken();
           s.auth.token = getAccessToken();
           s.connect();
         } catch {
-          // Refresh itself failed - the whole session is over, not just
-          // the socket. AuthContext's own axios interceptor handles
-          // logging the user out; nothing more to do here.
+          // Refresh failed, including an identity mismatch - the whole
+          // session is over, not just the socket.
+          triggerAuthFailure();
         }
       }
     });
