@@ -16,6 +16,9 @@ const envSchema = z.object({
   // production this would be the real API domain.
   PUBLIC_URL: z.string().url().default('http://localhost:5001'),
   UPLOAD_DIR: z.string().default('uploads'),
+  // Number of reverse-proxy hops to trust for req.ip (see app.js). 0 = no
+  // proxy, use the raw connection address - correct for local dev.
+  TRUST_PROXY: z.coerce.number().int().nonnegative().default(0),
 });
 
 const parsed = envSchema.safeParse(process.env);
