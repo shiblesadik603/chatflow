@@ -352,11 +352,17 @@ input {
 }
 
 .message-bubble {
+  position: relative;
   max-width: 60%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 0.5rem 0.75rem;
+}
+
+.message-bubble:hover .message-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .message-row.own .message-bubble {
@@ -392,6 +398,84 @@ input {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin: 0.25rem 0;
+}
+
+.message-ticks {
+  letter-spacing: -2px;
+}
+
+.message-ticks.read {
+  color: #93c5fd;
+}
+
+.message-row:not(.own) .message-ticks {
+  display: none;
+}
+
+.message-actions {
+  position: absolute;
+  top: -0.75rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.message-actions button {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+}
+
+.message-actions button:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.message-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.message-edit-form input {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.message-edit-actions button {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.message-action-error {
+  font-size: 0.7rem;
+  color: var(--color-danger);
+  margin-top: 0.2rem;
+}
+
+.typing-indicator {
+  padding: 0 1.5rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .message-input-form {

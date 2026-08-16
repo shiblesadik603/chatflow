@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export const MessageInput = ({ onSend, disabled }) => {
+export const MessageInput = ({ onSend, onTyping, disabled }) => {
   const [text, setText] = useState('');
 
   const handleSubmit = (e) => {
@@ -17,7 +17,10 @@ export const MessageInput = ({ onSend, disabled }) => {
         type="text"
         placeholder="Type a message..."
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          onTyping?.();
+        }}
         disabled={disabled}
       />
       <button type="submit" disabled={disabled || !text.trim()}>
