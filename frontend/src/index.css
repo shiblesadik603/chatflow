@@ -435,6 +435,17 @@ input {
   flex: 1;
 }
 
+.mobile-back-button {
+  display: none;
+  border: none;
+  background: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  color: var(--color-text);
+}
+
 .connection-warning {
   font-size: 0.8rem;
   color: #b45309;
@@ -1104,4 +1115,41 @@ input {
 .danger-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Below this width the fixed 320px sidebar leaves almost no room for the
+   chat panel (e.g. ~90px on a 412px-wide phone), which is what was making
+   message bubbles wrap to one character per line. Show one panel at a time
+   instead of squeezing both side by side - conversation list first, then
+   the open chat full-width, with a back button to return. */
+@media (max-width: 768px) {
+  .chat-page {
+    position: relative;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+  }
+
+  .sidebar,
+  .chat-window {
+    display: none;
+  }
+
+  .chat-page:not(.has-active-conversation) .sidebar {
+    display: flex;
+  }
+
+  .chat-page.has-active-conversation .chat-window {
+    display: flex;
+  }
+
+  .mobile-back-button {
+    display: inline-flex;
+  }
+
+  .message-bubble {
+    max-width: 80%;
+  }
 }

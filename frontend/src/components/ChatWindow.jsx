@@ -17,7 +17,7 @@ const otherParticipant = (conversation, currentUserId) =>
 
 const TYPING_STOP_DELAY = 2000;
 
-export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConversation }) => {
+export const ChatWindow = ({ conversation, onConversationsChanged, onBack, onLeftConversation }) => {
   const { user, setUser } = useAuth();
   const { socket, isConnected } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -226,6 +226,9 @@ export const ChatWindow = ({ conversation, onConversationsChanged, onLeftConvers
   return (
     <div className="chat-window">
       <header className="chat-header">
+        <button type="button" className="mobile-back-button" onClick={onBack} aria-label="Back to conversations">
+          ←
+        </button>
         <h2>{conversationTitle(conversation, user._id)}</h2>
         {conversation.type === 'group' && (
           <button type="button" className="link-button" onClick={() => setIsGroupInfoOpen(true)}>

@@ -79,7 +79,7 @@ export const ChatPage = () => {
   if (isLoading) return <div className="centered-message">Loading conversations...</div>;
 
   return (
-    <div className="chat-page">
+    <div className={`chat-page ${activeConversation ? 'has-active-conversation' : ''}`}>
       {!isConnected && <div className="connection-banner">Connection lost - reconnecting...</div>}
       <Sidebar
         conversations={conversations}
@@ -90,6 +90,7 @@ export const ChatPage = () => {
       <ChatWindow
         conversation={activeConversation}
         onConversationsChanged={refreshConversations}
+        onBack={() => setActiveConversation(null)}
         onLeftConversation={() => {
           setActiveConversation(null);
           refreshConversations();
