@@ -6,6 +6,19 @@ file/voice messages) built to demonstrate industry-standard backend practices.
 > This README grows with the project. Each phase adds its section (API docs,
 > Socket.IO architecture, Redis architecture, Docker setup, etc.) as it's built.
 
+**Live demo:** https://chatflow-one.vercel.app
+*(free-tier backend - first request after ~15 min idle can take 30-60s to wake up)*
+
+## Screenshots
+
+| Login | Real-time chat |
+|---|---|
+| ![Login page](docs/screenshots/login.png) | ![Chat view](docs/screenshots/chat-view.png) |
+
+| Mobile chat | Developer dashboard |
+|---|---|
+| ![Mobile chat](docs/screenshots/mobile-chat.png) | ![Developer dashboard](docs/screenshots/dashboard.png) |
+
 ## Tech Stack
 
 - **Backend:** Node.js, Express, MongoDB + Mongoose, Socket.IO, Redis, JWT, Zod, Multer
